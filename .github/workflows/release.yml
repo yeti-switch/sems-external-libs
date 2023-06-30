@@ -1,0 +1,25 @@
+name: build & release
+on:
+  push:
+    tags:
+      - 'v*'
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container: debian:bookworm
+    steps:
+      - run: apt update
+      - name: install aux deps
+        run: apt -y --no-install-recommends install git ca-certificates curl gnupg
+      - name: clone repo
+        uses: actions/checkout@v3
+        with:
+          submodules: true
+      - name: install build-deps
+        run: apt -y --no-install-recommends build-dep .
+      - name: build
+        run: dpkg-buildpackage -us -uc -b -j$(nproc)
+      - name: upload to pkg.yeti-switch.org. bookworm 1.13 main
+        run: ci/deploy.sh bookworm 1.13 main ../*.deb
+        env:
+          PKG_API_BASE: ${{secrets.PKG_API_BASE}}

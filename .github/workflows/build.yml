@@ -1,0 +1,21 @@
+name: build
+on:
+  push:
+    branches:
+      - "*"
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container: debian:bookworm
+    steps:
+      - run: apt update
+      - name: install aux deps
+        run: apt -y --no-install-recommends install git ca-certificates curl gnupg
+      - name: clone repo
+        uses: actions/checkout@v3
+        with:
+          submodules: true
+      - name: install build-deps
+        run: apt -y --no-install-recommends build-dep .
+      - name: build
+        run: dpkg-buildpackage -us -uc -b -j$(nproc)
