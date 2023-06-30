@@ -1,0 +1,18 @@
+MESSAGE(STATUS "Enable building of the bundled libstun")
+
+set(STUN_DIR third/stun)
+set(STUN_SRC_DIR ${PROJECT_SOURCE_DIR}/${STUN_DIR})
+set(STUN_BIN_DIR ${PROJECT_BINARY_DIR}/${STUN_DIR})
+set(STUN_BUNDLED_LIB ${STUN_BIN_DIR}/stuncore/libstuncore.a ${STUN_BIN_DIR}/common/libcommon.a)
+
+add_custom_target(libstuncore ALL DEPENDS ${BOTAN_bundled} ${STUN_BUNDLED_LIB})
+
+file(MAKE_DIRECTORY ${STUN_BIN_DIR})
+execute_process(COMMAND ${CMAKE_COMMAND} -E copy_directory ${STUN_SRC_DIR} ${STUN_BIN_DIR})
+add_custom_command(OUTPUT ${STUN_BUNDLED_LIB}
+    COMMAND make 'CXXFLAGS=-std=c++20 -fPIC -I${BOTAN_BUNDLED_INCLUDE_DIRS}' debug
+    WORKING_DIRECTORY ${STUN_BIN_DIR})
+
+install(DIRECTORY ${STUN_BIN_DIR}/stuncore/ DESTINATION ${SEMS_THIRD_INCLUDE_PATH}/stun FILES_MATCHING PATTERN *.h)
+install(DIRECTORY ${STUN_BIN_DIR}/common/ DESTINATION ${SEMS_THIRD_INCLUDE_PATH}/stun FILES_MATCHING PATTERN *.h PATTERN *.hpp)
+install(FILES ${STUN_BUNDLED_LIB} DESTINATION ${SEMS_THIRD_LIB_PATH})

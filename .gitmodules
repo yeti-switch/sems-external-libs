@@ -1,0 +1,10 @@
+[submodule "third/botan"]
+	path = third/botan
+	url = https://github.com/randombit/botan.git
+	branch = release-3
+[submodule "third/curl"]
+	path = third/curl
+	url = https://github.com/curl/curl.git
+[submodule "third/srtp"]
+	path = third/srtp
+	url = https://github.com/cisco/libsrtp.git
