@@ -18,7 +18,6 @@ include(cmake/botan_bundled.cmake)
 include(cmake/stun_bundled.cmake)
 include(cmake/srtp_bundled.cmake)
 include(cmake/curl_bundled.cmake)
-include(cmake/spandsp_bundled.cmake)
 include(cmake/confuse_bundled.cmake)
 include(cmake/s3_bundled.cmake)
 

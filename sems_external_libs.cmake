@@ -11,7 +11,6 @@ endfunction()
 import_static_lib(BOTAN libbotan-3.a)
 import_static_lib(CONFUSE libconfuse.a)
 import_static_lib(S3 libs3.a)
-import_static_lib(SPANDSP libspandsp.a)
 import_static_lib(SRTP libsrtp2.a)
 
 import_static_lib(CURL libcurl.a)
