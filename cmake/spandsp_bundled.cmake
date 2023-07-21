@@ -7,15 +7,17 @@ set (SPANDSP_BUNDLED_PREFIX ${SPANDSP_BIN_DIR}/src/.libs)
 set (SPANDSP_BUNDLED_LIB ${SPANDSP_BUNDLED_PREFIX}/libspandsp.a)
 # set (SPANDSP_INCLUDE_HEADER ${SPANDSP_BIN_DIR}/src/spandsp.h)
 
-set(SPANDSP_CONFIG_ARGS --enable-static --with-pic)
+set(SPANDSP_CONFIG_ARGS --enable-static --with-pic --enable-sse4-2 CFLAGS=-msse4.2\ -O3\ -g)
 
 add_custom_target(libspandsp ALL DEPENDS ${SPANDSP_BUNDLED_LIB})
 
 IF(NOT EXISTS ${SPANDSP_BIN_DIR}/configure_stdout)
     file(MAKE_DIRECTORY ${SPANDSP_BIN_DIR})
     execute_process(COMMAND ${CMAKE_COMMAND} -E copy_directory ${SPANDSP_SRC_DIR} ${SPANDSP_BIN_DIR} WORKING_DIRECTORY ${SPANDSP_BIN_DIR})
+    execute_process(COMMAND autoreconf -fi OUTPUT_FILE configure_stdout WORKING_DIRECTORY ${SPANDSP_BIN_DIR})
     execute_process(COMMAND ./configure ${SPANDSP_CONFIG_ARGS} OUTPUT_FILE configure_stdout WORKING_DIRECTORY ${SPANDSP_BIN_DIR})
 ENDIF(NOT EXISTS ${SPANDSP_BIN_DIR}/configure_stdout)
+
 
 add_custom_command(OUTPUT ${SPANDSP_BUNDLED_LIB}
     COMMAND make
