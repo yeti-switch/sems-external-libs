@@ -1,3 +1,7 @@
+sems-external-libs (0.2.1) stable; urgency=low
+  * use freeswitch spandsp
+ -- Michael Furmur <furmur@pm.me>  Fri, 21 Jul 2023 18:42:33 +0300
+
 sems-external-libs (0.1.0) stable; urgency=low
   * initial
  -- Michael Furmur <furmur@pm.me>  Fri, 30 Jun 2023 15:37:58 +0300
