@@ -1,3 +1,9 @@
+sems-external-libs (0.3.0) stable; urgency=low
+  [spandsp]
+  * fixed spandsp/unaligned.h byte order
+  * use O2 optimization
+ -- Michael Furmur <furmur@pm.me>  Thu, 10 Aug 2023 20:58:10 +0300
+
 sems-external-libs (0.2.1) stable; urgency=low
   * use freeswitch spandsp
  -- Michael Furmur <furmur@pm.me>  Fri, 21 Jul 2023 18:42:33 +0300
