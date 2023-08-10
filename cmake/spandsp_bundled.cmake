@@ -8,7 +8,7 @@ set (SPANDSP_BUNDLED_PREFIX ${SPANDSP_BIN_DIR}/src/.libs)
 set (SPANDSP_BUNDLED_LIB ${SPANDSP_BUNDLED_PREFIX}/libspandsp.a)
 # set (SPANDSP_INCLUDE_HEADER ${SPANDSP_BIN_DIR}/src/spandsp.h)
 
-set(SPANDSP_CONFIG_ARGS --enable-static --with-pic --enable-sse4-2 CFLAGS=-msse4.2\ -O3\ -g)
+set(SPANDSP_CONFIG_ARGS --enable-static --with-pic --enable-sse4-2 CFLAGS=-msse4.2\ -O2\ -g)
 
 add_custom_target(libspandsp ALL DEPENDS ${SPANDSP_BUNDLED_LIB})
 
