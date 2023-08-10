@@ -1,8 +1,18 @@
 diff --git a/src/spandsp/unaligned.h b/src/spandsp/unaligned.h
-index 189b870..e6bc737 100644
+index 189b870..74b789f 100644
 --- a/src/spandsp/unaligned.h
 +++ b/src/spandsp/unaligned.h
-@@ -41,9 +41,9 @@ extern "C"
+@@ -28,6 +28,9 @@
+ #if !defined(_SPANDSP_UNALIGNED_H_)
+ #define _SPANDSP_UNALIGNED_H_
+ 
++#define __USE_MISC 1
++#include <endian.h>
++
+ #if defined(__cplusplus)
+ extern "C"
+ {
+@@ -41,9 +44,9 @@ extern "C"
  #define PACK( __Declaration__ ) __pragma( pack(push, 1) ) __Declaration__ __pragma( pack(pop))
  #endif
  
