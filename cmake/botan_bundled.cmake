@@ -24,7 +24,7 @@ add_custom_command(OUTPUT ${BOTAN_BUNDLED_LIB}
 #needed to add as dependency for libstuncore
 add_library(BOTAN_bundled STATIC IMPORTED)
 set_property(TARGET BOTAN_bundled PROPERTY IMPORTED_LOCATION ${BOTAN_BUNDLED_LIB})
-set(BOTAN_BUNDLED_INCLUDE_DIRS ${BOTAN_BIN_DIR}/build/include)
+set(BOTAN_BUNDLED_INCLUDE_DIRS ${BOTAN_BIN_DIR}/build/include/public)
 
 file(GLOB BOTAN_INCLUDE_FILES "${BOTAN_BIN_DIR}/build/include/botan/*.h")
 FOREACH(rel_file ${BOTAN_INCLUDE_FILES})
