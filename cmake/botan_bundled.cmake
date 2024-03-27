@@ -24,15 +24,21 @@ add_custom_command(OUTPUT ${BOTAN_BUNDLED_LIB}
 #needed to add as dependency for libstuncore
 add_library(BOTAN_bundled STATIC IMPORTED)
 set_property(TARGET BOTAN_bundled PROPERTY IMPORTED_LOCATION ${BOTAN_BUNDLED_LIB})
-set(BOTAN_BUNDLED_INCLUDE_DIRS ${BOTAN_BIN_DIR}/build/include)
+set(BOTAN_BUNDLED_INCLUDE_DIRS ${BOTAN_BIN_DIR}/build/include/public)
 
-file(GLOB BOTAN_INCLUDE_FILES "${BOTAN_BIN_DIR}/build/include/botan/*.h")
+file(GLOB BOTAN_INCLUDE_FILES "${BOTAN_BIN_DIR}/build/include/public/botan/*.h")
 FOREACH(rel_file ${BOTAN_INCLUDE_FILES})
     get_filename_component(abs_file ${rel_file} REALPATH)
     install(FILES ${abs_file} DESTINATION ${SEMS_THIRD_INCLUDE_PATH}/botan)
 ENDFOREACH(rel_file ${BOTAN_INCLUDE_FILES})
 
-file(GLOB BOTAN_INCLUDE_FILES "${BOTAN_BIN_DIR}/build/include/botan/internal/*.h")
+file(GLOB BOTAN_INCLUDE_FILES "${BOTAN_BIN_DIR}/build/include/external/*.h")
+FOREACH(rel_file ${BOTAN_INCLUDE_FILES})
+    get_filename_component(abs_file ${rel_file} REALPATH)
+    install(FILES ${abs_file} DESTINATION ${SEMS_THIRD_INCLUDE_PATH}/botan/external)
+ENDFOREACH(rel_file ${BOTAN_INCLUDE_FILES})
+
+file(GLOB BOTAN_INCLUDE_FILES "${BOTAN_BIN_DIR}/build/include/internal/botan/internal/*.h")
 FOREACH(rel_file ${BOTAN_INCLUDE_FILES})
     get_filename_component(abs_file ${rel_file} REALPATH)
     install(FILES ${abs_file} DESTINATION ${SEMS_THIRD_INCLUDE_PATH}/botan/internal)
