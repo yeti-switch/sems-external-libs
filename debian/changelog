@@ -1,3 +1,7 @@
+sems-external-libs (0.4.3) stable; urgency=low
+  * fix clang build dep
+ -- Michael Furmur <furmur@pm.me>  Mon, 22 Apr 2024 20:55:52 +0300
+
 sems-external-libs (0.4.1) stable; urgency=low
   * add libboost-all-dev dep
  -- Michael Furmur <furmur@pm.me>  Mon, 22 Apr 2024 20:50:37 +0300
