@@ -15,6 +15,293 @@ index 5adcc7de7..181d11534 100644
                    throw TLS_Exception(Alert::ProtocolVersion, "Received unexpected record version");
                 }
              } else if(auto active = active_state()) {
+diff --git a/src/lib/tls/tls12/tls_client_impl_12.cpp b/src/lib/tls/tls12/tls_client_impl_12.cpp
+index 48867fc09..b3d4f604a 100644
+--- a/src/lib/tls/tls12/tls_client_impl_12.cpp
++++ b/src/lib/tls/tls12/tls_client_impl_12.cpp
+@@ -403,6 +403,8 @@ void Client_Impl_12::process_handshake_msg(const Handshake_State* active_state,
+          }
+ 
+          state.compute_session_keys(state.resume_master_secret());
++         if(policy().allow_ssl_key_log_file())
++            callbacks().tls_ssl_key_log_data("CLIENT_RANDOM", state.client_hello()->random(), state.session_keys().master_secret());
+ 
+          if(state.server_hello()->supports_session_ticket()) {
+             state.set_expected_next(Handshake_Type::NewSessionTicket);
+@@ -598,6 +600,8 @@ void Client_Impl_12::process_handshake_msg(const Handshake_State* active_state,
+          state.handshake_io(), state, policy(), *m_creds, state.maybe_server_public_key(), m_info.hostname(), rng()));
+ 
+       state.compute_session_keys();
++      if(policy().allow_ssl_key_log_file())
++         callbacks().tls_ssl_key_log_data("CLIENT_RANDOM", state.client_hello()->random(), state.session_keys().master_secret());
+ 
+       if(state.received_handshake_msg(Handshake_Type::CertificateRequest) && !state.client_certs()->empty()) {
+          auto private_key =
+diff --git a/src/lib/tls/tls12/tls_server_impl_12.cpp b/src/lib/tls/tls12/tls_server_impl_12.cpp
+index 20d27fe99..7b0398feb 100644
+--- a/src/lib/tls/tls12/tls_server_impl_12.cpp
++++ b/src/lib/tls/tls12/tls_server_impl_12.cpp
+@@ -486,6 +486,8 @@ void Server_Impl_12::process_client_key_exchange_msg(Server_Handshake_State& pen
+       new Client_Key_Exchange(contents, pending_state, pending_state.server_rsa_kex_key(), *m_creds, policy(), rng()));
+ 
+    pending_state.compute_session_keys();
++   if(policy().allow_ssl_key_log_file())
++      callbacks().tls_ssl_key_log_data("CLIENT_RANDOM", pending_state.client_hello()->random(), pending_state.session_keys().master_secret());
+ }
+ 
+ void Server_Impl_12::process_change_cipher_spec_msg(Server_Handshake_State& pending_state) {
+@@ -676,6 +678,8 @@ void Server_Impl_12::session_resume(Server_Handshake_State& pending_state, const
+ 
+    pending_state.mark_as_resumption();
+    pending_state.compute_session_keys(session.session.master_secret());
++   if(policy().allow_ssl_key_log_file())
++      callbacks().tls_ssl_key_log_data("CLIENT_RANDOM", pending_state.client_hello()->random(), pending_state.session_keys().master_secret());
+    pending_state.set_resume_certs(session.session.peer_certs());
+ 
+    // Give the application a chance for a final veto before fully
+diff --git a/src/lib/tls/tls13/tls_cipher_state.cpp b/src/lib/tls/tls13/tls_cipher_state.cpp
+index 8ab5d17d5..d4de090b0 100644
+--- a/src/lib/tls/tls13/tls_cipher_state.cpp
++++ b/src/lib/tls/tls13/tls_cipher_state.cpp
+@@ -119,8 +119,9 @@ constexpr size_t NONCE_LENGTH = 12;
+ std::unique_ptr<Cipher_State> Cipher_State::init_with_server_hello(const Connection_Side side,
+                                                                    secure_vector<uint8_t>&& shared_secret,
+                                                                    const Ciphersuite& cipher,
+-                                                                   const Transcript_Hash& transcript_hash) {
+-   auto cs = std::unique_ptr<Cipher_State>(new Cipher_State(side, cipher.prf_algo()));
++                                                                   const Transcript_Hash& transcript_hash,
++                                                                   ssl_key_log_callback sklc) {
++   auto cs = std::unique_ptr<Cipher_State>(new Cipher_State(side, cipher.prf_algo(), sklc));
+    cs->advance_without_psk();
+    cs->advance_with_server_hello(cipher, std::move(shared_secret), transcript_hash);
+    return cs;
+@@ -129,8 +130,9 @@ std::unique_ptr<Cipher_State> Cipher_State::init_with_server_hello(const Connect
+ std::unique_ptr<Cipher_State> Cipher_State::init_with_psk(const Connection_Side side,
+                                                           const Cipher_State::PSK_Type type,
+                                                           secure_vector<uint8_t>&& psk,
+-                                                          std::string_view prf_algo) {
+-   auto cs = std::unique_ptr<Cipher_State>(new Cipher_State(side, prf_algo));
++                                                          std::string_view prf_algo,
++                                                          ssl_key_log_callback sklc) {
++   auto cs = std::unique_ptr<Cipher_State>(new Cipher_State(side, prf_algo, sklc));
+    cs->advance_with_psk(type, std::move(psk));
+    return cs;
+ }
+@@ -147,6 +149,7 @@ void Cipher_State::advance_with_client_hello(const Transcript_Hash& transcript_h
+    // derive_write_traffic_key(client_early_traffic_secret);
+ 
+    m_exporter_master_secret = derive_secret(m_early_secret, "e exp master", transcript_hash);
++   if(m_ssl_key_log_callback) m_ssl_key_log_callback("EARLY_EXPORTER_MASTER_SECRET", m_exporter_master_secret);
+ 
+    m_salt = derive_secret(m_early_secret, "derived", empty_hash());
+    zap(m_early_secret);
+@@ -161,6 +164,8 @@ void Cipher_State::advance_with_server_finished(const Transcript_Hash& transcrip
+ 
+    auto client_application_traffic_secret = derive_secret(master_secret, "c ap traffic", transcript_hash);
+    auto server_application_traffic_secret = derive_secret(master_secret, "s ap traffic", transcript_hash);
++   if(m_ssl_key_log_callback) m_ssl_key_log_callback("CLIENT_TRAFFIC_SECRET_0", client_application_traffic_secret);
++   if(m_ssl_key_log_callback) m_ssl_key_log_callback("SERVER_TRAFFIC_SECRET_0", server_application_traffic_secret);
+ 
+    // Note: the secrets for processing client's application data
+    //       are not derived before the client's Finished message
+@@ -176,6 +181,7 @@ void Cipher_State::advance_with_server_finished(const Transcript_Hash& transcrip
+    }
+ 
+    m_exporter_master_secret = derive_secret(master_secret, "exp master", transcript_hash);
++   if(m_ssl_key_log_callback) m_ssl_key_log_callback("EXPORTER_SECRET", m_exporter_master_secret);
+ 
+    m_state = State::ServerApplicationTraffic;
+ }
+@@ -414,9 +420,10 @@ std::unique_ptr<MessageAuthenticationCode> create_hmac(std::string_view hash) {
+ 
+ }  // namespace
+ 
+-Cipher_State::Cipher_State(Connection_Side whoami, std::string_view hash_function) :
++Cipher_State::Cipher_State(Connection_Side whoami, std::string_view hash_function, ssl_key_log_callback sklc) :
+       m_state(State::Uninitialized),
+       m_connection_side(whoami),
++      m_ssl_key_log_callback(sklc),
+       m_extract(std::make_unique<HKDF_Extract>(create_hmac(hash_function))),
+       m_expand(std::make_unique<HKDF_Expand>(create_hmac(hash_function))),
+       m_hash(HashFunction::create_or_throw(hash_function)),
+@@ -473,6 +480,8 @@ void Cipher_State::advance_with_server_hello(const Ciphersuite& cipher,
+ 
+    const auto client_handshake_traffic_secret = derive_secret(handshake_secret, "c hs traffic", transcript_hash);
+    const auto server_handshake_traffic_secret = derive_secret(handshake_secret, "s hs traffic", transcript_hash);
++   if(m_ssl_key_log_callback) m_ssl_key_log_callback("CLIENT_HANDSHAKE_TRAFFIC_SECRET", client_handshake_traffic_secret);
++   if(m_ssl_key_log_callback) m_ssl_key_log_callback("SERVER_HANDSHAKE_TRAFFIC_SECRET", server_handshake_traffic_secret);
+ 
+    if(m_connection_side == Connection_Side::Server) {
+       derive_read_traffic_key(client_handshake_traffic_secret, true);
+diff --git a/src/lib/tls/tls13/tls_cipher_state.h b/src/lib/tls/tls13/tls_cipher_state.h
+index 8ec1af8de..666d3e615 100644
+--- a/src/lib/tls/tls13/tls_cipher_state.h
++++ b/src/lib/tls/tls13/tls_cipher_state.h
+@@ -9,6 +9,8 @@
+ #ifndef BOTAN_TLS_CIPHER_STATE_H_
+ #define BOTAN_TLS_CIPHER_STATE_H_
+ 
++#include <functional>
++
+ #include <botan/secmem.h>
+ #include <botan/tls_magic.h>
+ #include <botan/tls_messages.h>
+@@ -65,6 +67,7 @@ class BOTAN_TEST_API Cipher_State {
+          External,  // currently not implemented
+       };
+ 
++      typedef std::function<void (const char* label, const secure_vector<uint8_t>& secret)> ssl_key_log_callback;
+    public:
+       ~Cipher_State();
+ 
+@@ -74,7 +77,8 @@ class BOTAN_TEST_API Cipher_State {
+       static std::unique_ptr<Cipher_State> init_with_psk(Connection_Side side,
+                                                          PSK_Type type,
+                                                          secure_vector<uint8_t>&& psk,
+-                                                         std::string_view prf_algo);
++                                                         std::string_view prf_algo,
++                                                         ssl_key_log_callback sklc = nullptr);
+ 
+       /**
+        * Construct a Cipher_State after receiving a server hello message.
+@@ -82,7 +86,8 @@ class BOTAN_TEST_API Cipher_State {
+       static std::unique_ptr<Cipher_State> init_with_server_hello(Connection_Side side,
+                                                                   secure_vector<uint8_t>&& shared_secret,
+                                                                   const Ciphersuite& cipher,
+-                                                                  const Transcript_Hash& transcript_hash);
++                                                                  const Transcript_Hash& transcript_hash,
++                                                                  ssl_key_log_callback sklc);
+ 
+       /**
+        * Transition internal secrets/keys for transporting early application data.
+@@ -260,7 +265,7 @@ class BOTAN_TEST_API Cipher_State {
+        * @param whoami         whether we play the Server or Client
+        * @param hash_function  the negotiated hash function to be used
+        */
+-      Cipher_State(Connection_Side whoami, std::string_view hash_function);
++      Cipher_State(Connection_Side whoami, std::string_view hash_function, ssl_key_log_callback sklc);
+ 
+       void advance_with_psk(PSK_Type type, secure_vector<uint8_t>&& psk);
+       void advance_without_psk();
+@@ -304,6 +309,7 @@ class BOTAN_TEST_API Cipher_State {
+    private:
+       State m_state;
+       Connection_Side m_connection_side;
++      ssl_key_log_callback m_ssl_key_log_callback;
+ 
+       std::unique_ptr<AEAD_Mode> m_encrypt;
+       std::unique_ptr<AEAD_Mode> m_decrypt;
+diff --git a/src/lib/tls/tls13/tls_client_impl_13.cpp b/src/lib/tls/tls13/tls_client_impl_13.cpp
+index 112b78a25..150ae1fb0 100644
+--- a/src/lib/tls/tls13/tls_client_impl_13.cpp
++++ b/src/lib/tls/tls13/tls_client_impl_13.cpp
+@@ -327,7 +327,11 @@ void Client_Impl_13::handle(const Server_Hello_13& sh) {
+    } else {
+       m_resumed_session.reset();  // might have been set if we attempted a resumption
+       m_cipher_state = Cipher_State::init_with_server_hello(
+-         m_side, std::move(shared_secret), cipher.value(), m_transcript_hash.current());
++         m_side, std::move(shared_secret), cipher.value(), m_transcript_hash.current(),
++         [this](const char* label, const secure_vector<uint8_t>& secret){ 
++            if(policy().allow_ssl_key_log_file()) 
++               callbacks().tls_ssl_key_log_data(label, m_handshake_state.client_hello().random(), secret);
++         });
+    }
+ 
+    callbacks().tls_examine_extensions(sh.extensions(), Connection_Side::Server, Handshake_Type::ServerHello);
+diff --git a/src/lib/tls/tls13/tls_server_impl_13.cpp b/src/lib/tls/tls13/tls_server_impl_13.cpp
+index b6edc9daa..866c54457 100644
+--- a/src/lib/tls/tls13/tls_server_impl_13.cpp
++++ b/src/lib/tls/tls13/tls_server_impl_13.cpp
+@@ -232,14 +232,22 @@ void Server_Impl_13::handle_reply_to_client_hello(Server_Hello_13 server_hello)
+                                   return Cipher_State::init_with_psk(Connection_Side::Server,
+                                                                      Cipher_State::PSK_Type::Resumption,
+                                                                      m_resumed_session->extract_master_secret(),
+-                                                                     cipher.prf_algo());
++                                                                     cipher.prf_algo(),
++                                                                     [this](const char* label, const secure_vector<uint8_t>& secret){ 
++                                                                        if(policy().allow_ssl_key_log_file()) 
++                                                                           callbacks().tls_ssl_key_log_data(label, m_handshake_state.client_hello().random(), secret);
++                                                                     });
+                                },
+                                [&, this](ExternalPSK psk) {
+                                   m_psk_identity = psk.identity();
+                                   return Cipher_State::init_with_psk(Connection_Side::Server,
+                                                                      Cipher_State::PSK_Type::External,
+                                                                      psk.extract_master_secret(),
+-                                                                     cipher.prf_algo());
++                                                                     cipher.prf_algo(),
++                                                                     [this](const char* label, const secure_vector<uint8_t>& secret){ 
++                                                                        if(policy().allow_ssl_key_log_file()) 
++                                                                           callbacks().tls_ssl_key_log_data(label, m_handshake_state.client_hello().random(), secret);
++                                                                     });
+                                }},
+                     psk_extension->take_session_to_resume_or_psk());
+ 
+@@ -294,7 +302,11 @@ void Server_Impl_13::handle_reply_to_client_hello(Server_Hello_13 server_hello)
+          return std::move(psk_cipher_state);
+       } else {
+          return Cipher_State::init_with_server_hello(
+-            m_side, my_keyshare->take_shared_secret(), cipher, m_transcript_hash.current());
++            m_side, my_keyshare->take_shared_secret(), cipher, m_transcript_hash.current(),
++            [this](const char* label, const secure_vector<uint8_t>& secret){ 
++               if(policy().allow_ssl_key_log_file()) 
++                  callbacks().tls_ssl_key_log_data(label, m_handshake_state.client_hello().random(), secret);
++            });
+       }
+    }();
+ 
+diff --git a/src/lib/tls/tls_callbacks.h b/src/lib/tls/tls_callbacks.h
+index 4a889c5cc..393903557 100644
+--- a/src/lib/tls/tls_callbacks.h
++++ b/src/lib/tls/tls_callbacks.h
+@@ -560,6 +560,16 @@ class BOTAN_PUBLIC_API(2, 0) Callbacks {
+       virtual void tls_log_debug_bin(const char* descr, const uint8_t val[], size_t val_len) {
+          BOTAN_UNUSED(descr, val, val_len);
+       }
++
++      /**
++       * Optional callback: gives away data for ssl key log file
++       * @param label secret label for tls
++       * @param client_random random value from ClientHello message
++       * @param secret secret value
++       */
++      virtual void tls_ssl_key_log_data(const char* label, const std::vector<uint8_t>& client_random, const secure_vector<uint8_t>& secret) {
++         BOTAN_UNUSED(label, client_random, secret);
++      }
+ };
+ 
+ }  // namespace TLS
+diff --git a/src/lib/tls/tls_policy.cpp b/src/lib/tls/tls_policy.cpp
+index 57591667d..572d32622 100644
+--- a/src/lib/tls/tls_policy.cpp
++++ b/src/lib/tls/tls_policy.cpp
+@@ -20,6 +20,10 @@
+ 
+ namespace Botan::TLS {
+ 
++bool Policy::allow_ssl_key_log_file() const {
++   return false;
++}
++
+ std::vector<Signature_Scheme> Policy::allowed_signature_schemes() const {
+    std::vector<Signature_Scheme> schemes;
+ 
+diff --git a/src/lib/tls/tls_policy.h b/src/lib/tls/tls_policy.h
+index 6e384b429..d898c3952 100644
+--- a/src/lib/tls/tls_policy.h
++++ b/src/lib/tls/tls_policy.h
+@@ -31,6 +31,11 @@ namespace TLS {
+ */
+ class BOTAN_PUBLIC_API(2, 0) Policy {
+    public:
++      /**
++      * Allow ssl key log file
++      */
++      virtual bool allow_ssl_key_log_file() const;
++
+       /**
+       * Returns a list of ciphers we are willing to negotiate, in
+       * order of preference.
 diff --git a/src/lib/x509/x509_ext.cpp b/src/lib/x509/x509_ext.cpp
 index 60ef4cce2..6813d14a4 100644
 --- a/src/lib/x509/x509_ext.cpp
