@@ -17,7 +17,7 @@ IF(NOT EXISTS ${BOTAN_BIN_DIR}/configure_stdout)
 ENDIF(NOT EXISTS ${BOTAN_BIN_DIR}/configure_stdout)
 
 add_custom_target(libbotan ALL DEPENDS ${BOTAN_BUNDLED_LIB})
-add_custom_command(OUTPUT ${BOTAN_BUNDLED_LIB}
+add_custom_command(USES_TERMINAL OUTPUT ${BOTAN_BUNDLED_LIB}
     COMMAND make
     WORKING_DIRECTORY ${BOTAN_BIN_DIR})
 

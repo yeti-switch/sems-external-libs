@@ -21,7 +21,7 @@ IF(NOT EXISTS ${SPANDSP_BIN_DIR}/configure_stdout)
 ENDIF(NOT EXISTS ${SPANDSP_BIN_DIR}/configure_stdout)
 
 
-add_custom_command(OUTPUT ${SPANDSP_BUNDLED_LIB}
+add_custom_command(USES_TERMINAL OUTPUT ${SPANDSP_BUNDLED_LIB}
     COMMAND make
     WORKING_DIRECTORY ${SPANDSP_BIN_DIR})
 

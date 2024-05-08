@@ -18,7 +18,7 @@ add_custom_target(libcurl ALL DEPENDS ${CURL_BUNDLED_LIB})
 
 file(MAKE_DIRECTORY ${CURL_BIN_DIR})
 execute_process(COMMAND ${CMAKE_COMMAND} -E copy_directory ${CURL_SRC_DIR} ${CURL_BIN_DIR})
-add_custom_command(OUTPUT ${CURL_BUNDLED_LIB}
+add_custom_command(USES_TERMINAL OUTPUT ${CURL_BUNDLED_LIB}
     COMMAND ./buildconf
     COMMAND ./configure ${CURL_CONFIG_ARGS}
     COMMAND make

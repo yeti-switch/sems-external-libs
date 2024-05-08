@@ -11,7 +11,7 @@ set(CONFUSE_CONFIG_ARGS --enable-shared=no --enable-static=yes --with-pic=yes)
 file(MAKE_DIRECTORY ${CONFUSE_BIN_DIR})
 
 add_custom_target(libconfuse ALL DEPENDS ${CONFUSE_BUNDLED_LIB})
-add_custom_command(OUTPUT ${CONFUSE_BUNDLED_LIB}
+add_custom_command(USES_TERMINAL OUTPUT ${CONFUSE_BUNDLED_LIB}
     COMMAND ${CMAKE_COMMAND} -E copy_directory ${CONFUSE_SRC_DIR} ${CONFUSE_BIN_DIR}
     COMMAND ./configure ${CONFUSE_CONFIG_ARGS}
     COMMAND make
