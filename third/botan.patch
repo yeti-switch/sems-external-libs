@@ -961,174 +961,6 @@ index 19bbd1fb8..c22d28e6e 100644
  std::vector<std::string> Text_Policy::allowed_ciphers() const {
     return get_list("ciphers", Policy::allowed_ciphers());
  }
-diff --git a/src/lib/x509/x509_ext.cpp b/src/lib/x509/x509_ext.cpp
-index 60ef4cce2..6813d14a4 100644
---- a/src/lib/x509/x509_ext.cpp
-+++ b/src/lib/x509/x509_ext.cpp
-@@ -12,6 +12,7 @@
- #include <botan/ber_dec.h>
- #include <botan/der_enc.h>
- #include <botan/hash.h>
-+#include <botan/asn1_obj.h>
- #include <botan/x509cert.h>
- #include <botan/internal/bit_ops.h>
- #include <botan/internal/loadstor.h>
-@@ -80,6 +81,9 @@ std::unique_ptr<Certificate_Extension> extension_from_oid(const OID& oid) {
-       return std::make_unique<Cert_Extension::Authority_Information_Access>();
-    }
- 
-+   if(oid == Cert_Extension::TNAuthList::static_oid())
-+      return std::make_unique<Cert_Extension::TNAuthList>();
-+
-    return nullptr;  // unknown
- }
- 
-@@ -799,6 +803,56 @@ void OCSP_NoCheck::decode_inner(const std::vector<uint8_t>& buf) {
-    BER_Decoder(buf).verify_end();
- }
- 
-+TNAuthList::TNEntry::TNEntry()
-+   {}
-+
-+TNAuthList::TNEntry::~TNEntry()
-+   {}
-+
-+void TNAuthList::TNEntry::encode_into(DER_Encoder& to) const
-+   {}
-+
-+void TNAuthList::TNEntry::decode_from(class BER_Decoder& ber)
-+   {
-+      BER_Object obj = ber.get_next_object();
-+      if(obj.is_a(TN_ServiceProviderCode, ASN1_Class::ContextSpecific | ASN1_Class::Constructed)) {
-+          //ServiceProviderCode
-+          type = TN_ServiceProviderCode;
-+          BER_Decoder v(obj.bits(),obj.length());
-+          ASN1_String s;
-+          s.decode_from(v);
-+          spc = s.value();
-+      } else if(obj.is_a(TN_TelephoneNumberRange, ASN1_Class::ContextSpecific | ASN1_Class::Constructed)) {
-+          //TelephoneNumberRange
-+          type = TN_TelephoneNumberRange;
-+          ber.start_sequence();
-+          while(ber.more_items()) {
-+              range.emplace_back();
-+              auto &range_entry = range.back();
-+              ASN1_String s;
-+              s.decode_from(ber);
-+              range_entry.start = s.value();
-+              ber.decode(range_entry.count);
-+          }
-+          ber.end_cons();
-+      } else if(obj.is_a(TN_TelephoneNumber, ASN1_Class::ContextSpecific | ASN1_Class::Constructed)) {
-+          //TelephoneNumber
-+          type = TN_TelephoneNumber;
-+          BER_Decoder v(obj.bits(),obj.length());
-+          ASN1_String s;
-+          s.decode_from(v);
-+          one = s.value();
-+      } else {
-+          throw Decoding_Error("unexpected TNEntry type");
-+      }
-+   }
-+
-+void TNAuthList::decode_inner(const std::vector<uint8_t>& in)
-+   {
-+   m_size = in.size();
-+   BER_Decoder(in).decode_list(m_tn_entries).verify_end();
-+   }
-+
- std::vector<uint8_t> Unknown_Extension::encode_inner() const {
-    return m_bytes;
- }
-diff --git a/src/lib/x509/x509_ext.h b/src/lib/x509/x509_ext.h
-index 923e5799b..405e0af11 100644
---- a/src/lib/x509/x509_ext.h
-+++ b/src/lib/x509/x509_ext.h
-@@ -9,7 +9,11 @@
- #define BOTAN_X509_EXTENSIONS_H_
- 
- #include <botan/pkix_types.h>
-+#include <botan/asn1_obj.h>
- #include <set>
-+#include <string>
-+#include <vector>
-+#include <memory>
- 
- namespace Botan {
- 
-@@ -500,6 +504,72 @@ class OCSP_NoCheck final : public Certificate_Extension {
-       void decode_inner(const std::vector<uint8_t>&) override;
- };
- 
-+/**
-+* TNAuthList extension
-+*
-+* https://datatracker.ietf.org/doc/html/rfc8226
-+*/
-+class TNAuthList final : public Certificate_Extension
-+   {
-+   public:
-+      class TNEntry final : public ASN1_Object
-+         {
-+         public:
-+            enum Type {
-+              TN_ServiceProviderCode = 0,
-+              TN_TelephoneNumberRange,
-+              TN_TelephoneNumber
-+            };
-+            struct TelephoneNumberRange {
-+               std::string start;   //TelephoneNumber (IA5String)
-+               size_t count;        //2..MAX
-+            };
-+
-+            TNEntry();
-+            ~TNEntry();
-+
-+            void encode_into(DER_Encoder& to) const override;
-+            void decode_from(class BER_Decoder& from) override;
-+
-+            Type get_type() const { return type; }
-+
-+            const std::string& getServiceProviderCode() const
-+            { return spc; }
-+
-+            const std::vector<TelephoneNumberRange>& getTelephoneNumberRange() const
-+            { return range; }
-+
-+            const std::string& getTelephoneNumber() const
-+            { return one; }
-+
-+         private:
-+            Type type;
-+            std::string spc;                         //ServiceProviderCode
-+            std::vector<TelephoneNumberRange> range; //TelephoneNumberRange
-+            std::string one;                         //TelephoneNumber
-+         };
-+
-+      TNAuthList() = default;
-+
-+      std::unique_ptr<Certificate_Extension> copy() const override { return std::make_unique<TNAuthList>(); }
-+      static OID static_oid() { return OID("1.3.6.1.5.5.7.1.26"); }
-+      OID oid_of() const override { return static_oid(); }
-+
-+      size_t get_size() const { return m_size; }
-+      const std::vector<TNEntry>& get_entries() const { return m_tn_entries; }
-+
-+   private:
-+      std::string oid_name() const override
-+       { return "X509v3.TNAuthList"; }
-+
-+      bool should_encode() const override { return false; }
-+      std::vector<uint8_t> encode_inner() const override { return {}; }
-+      void decode_inner(const std::vector<uint8_t>&) override;
-+
-+      size_t m_size;
-+      std::vector<TNEntry> m_tn_entries;
-+   };
-+
- /**
- * An unknown X.509 extension
- * Will add a failure to the path validation result, if critical
 diff --git a/src/tests/test_tls_cipher_state.cpp b/src/tests/test_tls_cipher_state.cpp
 index 1875bb82b..b1b81d7a7 100644
 --- a/src/tests/test_tls_cipher_state.cpp
@@ -1676,3 +1508,328 @@ index 6b1c29516..971ed4199 100644
              cs->advance_with_client_finished(
                 Botan::hex_decode("305e4a0a7cee581b282c571b251b20138a1a6a21918937a6bb95b1e9ba1b5cac"));
  
+diff --git a/src/build-data/oids.txt b/src/build-data/oids.txt
+index 781efa928..fcd08028c 100644
+--- a/src/build-data/oids.txt
++++ b/src/build-data/oids.txt
+@@ -318,6 +318,7 @@
+ 2.5.29.36 = X509v3.PolicyConstraints
+ 2.5.29.37 = X509v3.ExtendedKeyUsage
+ 1.3.6.1.5.5.7.1.1 = PKIX.AuthorityInformationAccess
++1.3.6.1.5.5.7.1.26 = PKIX.TNAuthList
+ 
+ 2.5.29.32.0 = X509v3.AnyPolicy
+ 
+diff --git a/src/lib/asn1/oid_maps.cpp b/src/lib/asn1/oid_maps.cpp
+index bed6e9bda..9df738591 100644
+--- a/src/lib/asn1/oid_maps.cpp
++++ b/src/lib/asn1/oid_maps.cpp
+@@ -216,6 +216,7 @@ std::unordered_map<std::string, std::string> OID_Map::load_oid2str_map() {
+       {"1.3.6.1.4.1.311.20.2.3", "Microsoft UPN"},
+       {"1.3.6.1.4.1.8301.3.1.2.9.0.38", "secp521r1"},
+       {"1.3.6.1.5.5.7.1.1", "PKIX.AuthorityInformationAccess"},
++      {"1.3.6.1.5.5.7.1.26", "PKIX.TNAuthList"},
+       {"1.3.6.1.5.5.7.3.1", "PKIX.ServerAuth"},
+       {"1.3.6.1.5.5.7.3.2", "PKIX.ClientAuth"},
+       {"1.3.6.1.5.5.7.3.3", "PKIX.CodeSigning"},
+@@ -449,6 +450,7 @@ std::unordered_map<std::string, OID> OID_Map::load_str2oid_map() {
+       {"PKIX.OCSP.NoCheck", OID({1, 3, 6, 1, 5, 5, 7, 48, 1, 5})},
+       {"PKIX.OCSPSigning", OID({1, 3, 6, 1, 5, 5, 7, 3, 9})},
+       {"PKIX.ServerAuth", OID({1, 3, 6, 1, 5, 5, 7, 3, 1})},
++      {"PKIX.TNAuthList", OID({1, 3, 6, 1, 5, 5, 7, 1, 26})},
+       {"PKIX.TimeStamping", OID({1, 3, 6, 1, 5, 5, 7, 3, 8})},
+       {"PKIX.XMPPAddr", OID({1, 3, 6, 1, 5, 5, 7, 8, 5})},
+       {"RIPEMD-160", OID({1, 3, 36, 3, 2, 1})},
+diff --git a/src/lib/x509/x509_ext.cpp b/src/lib/x509/x509_ext.cpp
+index c54b58c10..15f53be22 100644
+--- a/src/lib/x509/x509_ext.cpp
++++ b/src/lib/x509/x509_ext.cpp
+@@ -14,6 +14,7 @@
+ #include <botan/hash.h>
+ #include <botan/x509cert.h>
+ #include <botan/internal/bit_ops.h>
++#include <botan/internal/fmt.h>
+ #include <botan/internal/loadstor.h>
+ #include <algorithm>
+ #include <set>
+@@ -80,9 +81,28 @@ std::unique_ptr<Certificate_Extension> extension_from_oid(const OID& oid) {
+       return std::make_unique<Cert_Extension::Authority_Information_Access>();
+    }
+ 
++   if(oid == Cert_Extension::TNAuthList::static_oid()) {
++      return std::make_unique<Cert_Extension::TNAuthList>();
++   }
++
+    return nullptr;  // unknown
+ }
+ 
++bool is_valid_telephone_number(const ASN1_String& tn) {
++   //TelephoneNumber ::= IA5String (SIZE (1..15)) (FROM ("0123456789#*"))
++   static std::string valid_tn_chars("0123456789#*");
++
++   if(tn.empty() || (tn.size() > 15)) {
++      return false;
++   }
++
++   if(tn.value().find_first_not_of(valid_tn_chars) != std::string::npos) {
++      return false;
++   }
++
++   return true;
++}
++
+ }  // namespace
+ 
+ /*
+@@ -764,6 +784,70 @@ void CRL_Issuing_Distribution_Point::decode_inner(const std::vector<uint8_t>& bu
+    BER_Decoder(buf).decode(m_distribution_point).verify_end();
+ }
+ 
++void TNAuthList::Entry::encode_into(DER_Encoder&) const {
++   throw Not_Implemented("TNAuthList extension entry serialization is not supported");
++}
++
++void TNAuthList::Entry::decode_from(class BER_Decoder& ber) {
++   BER_Object obj = ber.get_next_object();
++
++   m_type = static_cast<Type>(obj.type_tag());
++
++   switch(m_type) {
++      case ServiceProviderCode: {
++         ASN1_String spc_string;
++         BER_Decoder(obj).decode(spc_string);
++         m_data = std::move(spc_string);
++      } break;
++      case TelephoneNumberRange: {
++         m_data = RangeContainer();
++         auto& range_items = std::get<RangeContainer>(m_data);
++         BER_Decoder list = BER_Decoder(obj).start_sequence();
++         while(list.more_items()) {
++            TelephoneNumberRangeData entry;
++
++            list.decode(entry.start);
++            if(!is_valid_telephone_number(entry.start)) {
++               throw Decoding_Error(fmt("Invalid TelephoneNumberRange start {}", entry.start.value()));
++            }
++
++            list.decode(entry.count);
++            if(entry.count < 2) {
++               throw Decoding_Error(fmt("Invalid TelephoneNumberRange count {}", entry.count));
++            }
++
++            range_items.emplace_back(std::move(entry));
++         }
++         list.end_cons();
++
++         if(range_items.empty()) {
++            throw Decoding_Error("TelephoneNumberRange is empty");
++         }
++      } break;
++      case TelephoneNumber: {
++         ASN1_String one_string;
++         BER_Decoder(obj).decode(one_string);
++         if(!is_valid_telephone_number(one_string)) {
++            throw Decoding_Error(fmt("Invalid TelephoneNumber {}", one_string.value()));
++         }
++         m_data = std::move(one_string);
++      } break;
++      default:
++         throw Decoding_Error(fmt("Unexpected TNEntry type {}", m_type));
++   };
++}
++
++std::vector<uint8_t> TNAuthList::encode_inner() const {
++   throw Not_Implemented("TNAuthList extension serialization is not supported");
++}
++
++void TNAuthList::decode_inner(const std::vector<uint8_t>& in) {
++   BER_Decoder(in).decode_list(m_tn_entries).verify_end();
++   if(m_tn_entries.empty()) {
++      throw Decoding_Error("TNAuthorizationList is empty");
++   }
++}
++
+ void OCSP_NoCheck::decode_inner(const std::vector<uint8_t>& buf) {
+    BER_Decoder(buf).verify_end();
+ }
+diff --git a/src/lib/x509/x509_ext.h b/src/lib/x509/x509_ext.h
+index 923e5799b..9087af98d 100644
+--- a/src/lib/x509/x509_ext.h
++++ b/src/lib/x509/x509_ext.h
+@@ -500,6 +500,74 @@ class OCSP_NoCheck final : public Certificate_Extension {
+       void decode_inner(const std::vector<uint8_t>&) override;
+ };
+ 
++/**
++* TNAuthList extension
++*
++* RFC8226 Secure Telephone Identity Credentials
++*   https://www.rfc-editor.org/rfc/rfc8226#section-9
++*/
++class BOTAN_PUBLIC_API(3, 5) TNAuthList final : public Certificate_Extension {
++   public:
++      class Entry final : public ASN1_Object {
++         public:
++            /* TNEntry choice values
++             * see: https://datatracker.ietf.org/doc/html/rfc8226#section-9 */
++            enum Type { ServiceProviderCode = 0, TelephoneNumberRange = 1, TelephoneNumber = 2 };
++
++            struct TelephoneNumberRangeData {
++                  ASN1_String start;  //TelephoneNumber (IA5String)
++                  size_t count;       //2..MAX
++            };
++
++            using RangeContainer = std::vector<TelephoneNumberRangeData>;
++            using DataContainer = std::variant<ASN1_String, RangeContainer>;
++
++            void encode_into(DER_Encoder&) const override;
++            void decode_from(class BER_Decoder& from) override;
++
++            Type type() const { return m_type; }
++
++            const std::string& service_provider_code() const {
++               BOTAN_STATE_CHECK(type() == Type::ServiceProviderCode);
++               return std::get<ASN1_String>(m_data).value();
++            }
++
++            const RangeContainer& telephone_number_range() const {
++               BOTAN_STATE_CHECK(type() == Type::TelephoneNumberRange);
++               return std::get<RangeContainer>(m_data);
++            }
++
++            const std::string& telephone_number() const {
++               BOTAN_STATE_CHECK(type() == Type::TelephoneNumber);
++               return std::get<ASN1_String>(m_data).value();
++            }
++
++         private:
++            Type m_type;
++            DataContainer m_data;
++      };
++
++      TNAuthList() = default;
++
++      std::unique_ptr<Certificate_Extension> copy() const override { return std::make_unique<TNAuthList>(*this); }
++
++      static OID static_oid() { return OID("1.3.6.1.5.5.7.1.26"); }
++
++      OID oid_of() const override { return static_oid(); }
++
++      const std::vector<Entry>& entries() const { return m_tn_entries; }
++
++   private:
++      std::string oid_name() const override { return "PKIX.TNAuthList"; }
++
++      bool should_encode() const override { return true; }
++
++      std::vector<uint8_t> encode_inner() const override;
++      void decode_inner(const std::vector<uint8_t>&) override;
++
++      std::vector<Entry> m_tn_entries;
++};
++
+ /**
+ * An unknown X.509 extension
+ * Will add a failure to the path validation result, if critical
+diff --git a/src/tests/data/x509/x509test/TNAuthList.pem b/src/tests/data/x509/x509test/TNAuthList.pem
+new file mode 100644
+index 000000000..b89d3538f
+--- /dev/null
++++ b/src/tests/data/x509/x509test/TNAuthList.pem
+@@ -0,0 +1,22 @@
++-----BEGIN CERTIFICATE-----
++MIIDuDCCAqCgAwIBAgIUGGQL93TfVInWXgkDOnqPlXNxX04wDQYJKoZIhvcNAQEL
++BQAwajELMAkGA1UEBhMCVVMxCzAJBgNVBAgMAlZBMRIwEAYDVQQHDAlTb21ld2hl
++cmUxGjAYBgNVBAoMEUFjbWVUZWxlY29tLCBJbmMuMQ0wCwYDVQQLDARWT0lQMQ8w
++DQYDVQQDDAZTSEFLRU4wHhcNMjQwNjExMjAwOTU1WhcNMjQwNzExMjAwOTU1WjBq
++MQswCQYDVQQGEwJVUzELMAkGA1UECAwCVkExEjAQBgNVBAcMCVNvbWV3aGVyZTEa
++MBgGA1UECgwRQWNtZVRlbGVjb20sIEluYy4xDTALBgNVBAsMBFZPSVAxDzANBgNV
++BAMMBlNIQUtFTjCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAJ+jY6NZ
++RDcRkhRaoMNxXwIx62m0q94e1rVgCXUmwJ+CEl7XCsHSLj8L5g4Z2KaKKPCR6cnJ
++twv4WNqBl6v2z9CNdivRKyy9s1hYqW3wDy2CRP9d9zTD/zZJnrLNmgSfKf+/KEdl
++90ATy/iKC3oELW1Dm6ujKXx3xsY3k2yXlEgk+ybyLtimji1c8GHf8G+v1OiGImra
++uF5qVIeqDY667XhTYAQonjvL7xGlHskZXTTLfg1+zg+IHqbVz+eGHO+d4Hhvn8h/
++8aweT3w5rEj76gCv5OX3BfC3fz4bcHQ3saxqMicCxUQOTwvEZLubH3h26FlRWYhF
++FRCz2Wt6h86xnpUCAwEAAaNWMFQwMwYIKwYBBQUHARoEJzAloAYWBDEwMDGhFDAS
++FgMxMTECAgCAFgMyMjICAgEAogUWAzMzMzAdBgNVHQ4EFgQUwxCS/0NSRMccL6lw
++RHGeyCAz1bIwDQYJKoZIhvcNAQELBQADggEBAHXItFikv22OpoXjzMVaD0oguf4J
++aSxdRw74qZO0BdDGqMshMj1EW+RI7fxPToUPfyzl4DylWE67BQyNIjM0gRob5dBb
++iJvbmoZO2L+kq9ZvsZKAxBpBjIh7rnRw0ifnsHTFcTJ2ezwNrQU8CxOmtXfoLAxf
++r+BPVVNW1gfAMwJonjzNFQsriwJX3LWx4piNP0BFnXksnq8qBdTiVPAMjOVQSMQY
++wt/CGZ0AXKpEUWWGTgbbyKP/NCXKwm1QyY0jl6vzlJjA8l7ZIJfCJvu2DUHXA+0f
++SR6bDKuMdwWlaXy3yvw3pFgdzKDkYyAML0JJ1ZTZk4Bd9PGik1uL0+yhsCE=
++-----END CERTIFICATE-----
+diff --git a/src/tests/unit_x509.cpp b/src/tests/unit_x509.cpp
+index 525e2d427..4520bacd3 100644
+--- a/src/tests/unit_x509.cpp
++++ b/src/tests/unit_x509.cpp
+@@ -1514,6 +1514,61 @@ Test::Result test_hashes(const Botan::Private_Key& key, const std::string& hash_
+    return result;
+ }
+ 
++Test::Result test_x509_tn_auth_list_extension_decode() {
++   /* cert with TNAuthList extension data was generated by asn1parse cfg:
++
++      asn1=SEQUENCE:tn_auth_list
++
++      [tn_auth_list]
++      spc=EXP:0,IA5:1001
++      range=EXP:1,SEQUENCE:TelephoneNumberRange
++      one=EXP:2,IA5:333
++
++      [TelephoneNumberRange]
++      start1=IA5:111
++      count1=INT:128
++      start2=IA5:222
++      count2=INT:256
++    */
++   const std::string filename("TNAuthList.pem");
++   Test::Result result("X509 TNAuthList decode");
++   result.start_timer();
++
++   Botan::X509_Certificate cert(Test::data_file("x509/x509test/" + filename));
++
++   using Botan::Cert_Extension::TNAuthList;
++
++   auto tn_auth_list = cert.v3_extensions().get_extension_object_as<TNAuthList>();
++
++   auto& tn_entries = tn_auth_list->entries();
++
++   result.confirm("cert has TNAuthList extension", tn_auth_list != nullptr, true);
++
++   result.test_throws("wrong telephone_number_range() accessor for spc",
++                      [&tn_entries] { tn_entries[0].telephone_number_range(); });
++   result.test_throws("wrong telephone_number() accessor for range",
++                      [&tn_entries] { tn_entries[1].telephone_number(); });
++   result.test_throws("wrong service_provider_code() accessor for one",
++                      [&tn_entries] { tn_entries[2].service_provider_code(); });
++
++   result.test_eq("spc entry type", tn_entries[0].type() == TNAuthList::Entry::ServiceProviderCode, true);
++   result.test_eq("spc entry data", tn_entries[0].service_provider_code(), "1001");
++
++   result.test_eq("range entry type", tn_entries[1].type() == TNAuthList::Entry::TelephoneNumberRange, true);
++   auto& range = tn_entries[1].telephone_number_range();
++   result.test_eq("range entries count", range.size(), 2);
++   result.test_eq("range entry 0 start data", range[0].start.value(), "111");
++   result.test_eq("range entry 0 count data", range[0].count, 128);
++   result.test_eq("range entry 1 start data", range[1].start.value(), "222");
++   result.test_eq("range entry 1 count data", range[1].count, 256);
++
++   result.test_eq("one entry type", tn_entries[2].type() == TNAuthList::Entry::TelephoneNumber, true);
++   result.test_eq("one entry data", tn_entries[2].telephone_number(), "333");
++
++   result.end_timer();
++   return result;
++}
++
+ std::vector<std::string> get_sig_paddings(const std::string& sig_algo, const std::string& hash) {
+    if(sig_algo == "RSA") {
+       return {"EMSA3(" + hash + ")", "EMSA4(" + hash + ")"};
+@@ -1655,6 +1710,7 @@ class X509_Cert_Unit_Tests final : public Test {
+          results.push_back(test_x509_authority_info_access_extension());
+          results.push_back(test_verify_gost2012_cert());
+          results.push_back(test_parse_rsa_pss_cert());
++         results.push_back(test_x509_tn_auth_list_extension_decode());
+    #endif
+ 
+          results.push_back(test_x509_encode_authority_info_access_extension());
