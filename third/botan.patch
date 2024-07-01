@@ -1653,6 +1653,19 @@ index c54b58c10..15f53be22 100644
     BER_Decoder(buf).verify_end();
  }
 diff --git a/src/lib/x509/x509_ext.h b/src/lib/x509/x509_ext.h
+index 9087af98d..61a5389ad 100644
+--- a/src/lib/x509/x509_ext.h
++++ b/src/lib/x509/x509_ext.h
+@@ -10,6 +10,7 @@
+ 
+ #include <botan/pkix_types.h>
+ #include <set>
++#include <variant>
+ 
+ namespace Botan {
+ 
+
+diff --git a/src/lib/x509/x509_ext.h b/src/lib/x509/x509_ext.h
 index 923e5799b..9087af98d 100644
 --- a/src/lib/x509/x509_ext.h
 +++ b/src/lib/x509/x509_ext.h
