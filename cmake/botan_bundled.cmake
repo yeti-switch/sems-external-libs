@@ -1,7 +1,7 @@
 MESSAGE(STATUS "Enable building of the bundled libbotan")
 
 set(BOTAN_DIR third/botan)
-set(BOTAN_PATCH_FILE ${PROJECT_SOURCE_DIR}/third/botan.patch)
+#set(BOTAN_PATCH_FILE ${PROJECT_SOURCE_DIR}/third/botan.patch)
 set(BOTAN_SRC_DIR ${PROJECT_SOURCE_DIR}/${BOTAN_DIR})
 set(BOTAN_BIN_DIR ${PROJECT_BINARY_DIR}/${BOTAN_DIR})
 set(BOTAN_BUNDLED_LIB ${BOTAN_BIN_DIR}/libbotan-3.a)
@@ -12,7 +12,7 @@ set(BOTAN_CONFIG_ARGS --cxxflags=-fPIC --disable-shared-library --without-docume
 IF(NOT EXISTS ${BOTAN_BIN_DIR}/configure_stdout)
     file(MAKE_DIRECTORY ${BOTAN_BIN_DIR})
     execute_process(COMMAND ${CMAKE_COMMAND} -E copy_directory ${BOTAN_SRC_DIR} ${BOTAN_BIN_DIR})
-    execute_process(COMMAND patch --silent --strip=1 --directory=${BOTAN_BIN_DIR} --input=${BOTAN_PATCH_FILE})
+#    execute_process(COMMAND patch --silent --strip=1 --directory=${BOTAN_BIN_DIR} --input=${BOTAN_PATCH_FILE})
     execute_process(COMMAND ./configure.py ${BOTAN_CONFIG_ARGS} OUTPUT_FILE configure_stdout WORKING_DIRECTORY ${BOTAN_BIN_DIR})
 ENDIF(NOT EXISTS ${BOTAN_BIN_DIR}/configure_stdout)
 
