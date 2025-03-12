@@ -25,3 +25,24 @@ index 189b870..74b789f 100644
  
  #if defined(__GNUC__)
  
+diff --git a/src/t4_rx.c b/src/t4_rx.c
+index 5d11868..3411e12 100644
+--- a/src/t4_rx.c
++++ b/src/t4_rx.c
+@@ -781,15 +781,6 @@ static int close_tiff_output_file(t4_rx_state_t *s)
+     t->tiff_file = NULL;
+     if (s->tiff.file)
+     {
+-        /* Try not to leave a file behind, if we didn't receive any pages to
+-           put in it. */
+-        if (s->current_page == 0)
+-        {
+-            if (remove(s->tiff.file) < 0)
+-                span_log(&s->logging, SPAN_LOG_WARNING, "%s: Failed to remove file.\n", s->tiff.file);
+-            /*endif*/
+-        }
+-        /*endif*/
+         span_free((char *) s->tiff.file);
+     }
+     /*endif*/
+
