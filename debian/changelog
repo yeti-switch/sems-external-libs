@@ -1,3 +1,7 @@
+sems-external-libs (0.4.9) stable; urgency=low
+  * spandsp: remove implicit empty TIFF files removing
+ -- Michael Furmur <furmur@pm.me>  Wed, 12 Mar 2025 21:21:09 +0200
+
 sems-external-libs (0.4.8) stable; urgency=low
   * ci: upload pkg to aws s3
  -- Michael Furmur <furmur@pm.me>  Thu, 12 Dec 2024 21:56:37 +0200
