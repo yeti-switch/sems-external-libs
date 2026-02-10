@@ -18,6 +18,7 @@ add_library(s3 STATIC ${s3_SRCS})
 target_compile_definitions(s3 PUBLIC LIBS3_VER_MAJOR="1" LIBS3_VER_MINOR="0")
 target_include_directories(s3 PUBLIC ${S3_INCLUDE_DIR} ${LIBXML2_INCLUDE_DIR})
 set_property(TARGET s3 PROPERTY POSITION_INDEPENDENT_CODE ON)
+add_definitions(-Wno-attribute-warning)
 
 target_link_libraries(s3 ${LIBXML2_LIBRARIES})
 set_target_properties(s3 PROPERTIES ARCHIVE_OUTPUT_DIRECTORY "${S3_BIN_DIR}/build")
