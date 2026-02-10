@@ -1,0 +1,16 @@
+diff --git a/src/lib/x509/x509cert.cpp b/src/lib/x509/x509cert.cpp
+index 97969c531..07c6cebbc 100644
+--- a/src/lib/x509/x509cert.cpp
++++ b/src/lib/x509/x509cert.cpp
+@@ -227,9 +227,10 @@ std::unique_ptr<X509_Certificate_Data> parse_x509_cert_body(const X509_Object& o
+             const auto server_auth = OID::from_name("PKIX.ServerAuth");
+             const auto client_auth = OID::from_name("PKIX.ClientAuth");
+             const auto ocsp_sign = OID::from_name("PKIX.OCSPSigning");
++            const auto anyExtendedKeyUsage = OID{2,5,29,37,0};
+ 
+             for(const auto& oid : ext_ku) {
+-               if(oid == server_auth || oid == client_auth || oid == ocsp_sign) {
++               if(oid == server_auth || oid == client_auth || oid == ocsp_sign || oid == anyExtendedKeyUsage) {
+                   return true;
+                }
+             }
