@@ -24,6 +24,7 @@
 #include <boost/crc.hpp>
 #include <botan/mac.h>
 #include <botan/hash.h>
+#include <botan/symkey.h>
 #include "stunauth.h"
 #include "fasthash.h"
 
