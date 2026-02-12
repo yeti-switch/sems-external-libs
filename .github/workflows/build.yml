@@ -35,6 +35,6 @@ jobs:
           s3_secret_access_key: ${{ secrets.DEB_AWS_SECRET_ACCESS_KEY }}
           s3_endpoint_url: ${{ secrets.DEB_AWS_ENDPOINT }}
           s3_codename: ${{ matrix.distribution }}
-          s3_prefix: '1.14'
+          s3_prefix: '1.13'
         if: startsWith(github.ref, 'refs/tags/v')
 
