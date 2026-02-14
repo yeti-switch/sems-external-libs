@@ -6,7 +6,7 @@ set(BOTAN_SRC_DIR ${PROJECT_SOURCE_DIR}/${BOTAN_DIR})
 set(BOTAN_BIN_DIR ${PROJECT_BINARY_DIR}/${BOTAN_DIR})
 set(BOTAN_BUNDLED_LIB ${BOTAN_BIN_DIR}/libbotan-3.a)
 
-set(BOTAN_CONFIG_ARGS --cxxflags=-fPIC --disable-shared-library --without-documentation --build-targets=static)
+set(BOTAN_CONFIG_ARGS --cxxflags=-fPIC --disable-shared-library --without-documentation --build-tool=ninja --build-targets=static --disable-modules=simd_4x32)
 
 #use execute_process instead of custom_command to generate headers before cmake install command invocation
 IF(NOT EXISTS ${BOTAN_BIN_DIR}/configure_stdout)
@@ -18,7 +18,7 @@ ENDIF(NOT EXISTS ${BOTAN_BIN_DIR}/configure_stdout)
 
 add_custom_target(libbotan ALL DEPENDS ${BOTAN_BUNDLED_LIB})
 add_custom_command(USES_TERMINAL OUTPUT ${BOTAN_BUNDLED_LIB}
-    COMMAND make
+    COMMAND ninja
     WORKING_DIRECTORY ${BOTAN_BIN_DIR})
 
 #needed to add as dependency for libstuncore
